@@ -1,0 +1,240 @@
+```html
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dinosaur Runner Game</title>
+
+<style>
+body {
+    margin: 0;
+    font-family: Arial, sans-serif;
+    background: #f1f5f9;
+    color: #1e293b;
+    text-align: center;
+}
+
+.container {
+    max-width: 850px;
+    margin: 40px auto;
+    padding: 20px;
+}
+
+h1 {
+    color: #2563eb;
+}
+
+.top {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+button {
+    border: none;
+    padding: 10px 16px;
+    border-radius: 8px;
+    cursor: pointer;
+    background: #2563eb;
+    color: white;
+    font-size: 15px;
+}
+
+#game {
+    position: relative;
+    height: 250px;
+    overflow: hidden;
+    background: linear-gradient(#dbeafe, #eff6ff);
+    border-bottom: 5px solid #64748b;
+    border-radius: 12px;
+    margin-top: 20px;
+}
+
+#dino {
+    position: absolute;
+    left: 60px;
+    bottom: 0;
+    font-size: 48px;
+    z-index: 2;
+}
+
+#obstacle {
+    position: absolute;
+    right: -50px;
+    bottom: 0;
+    font-size: 38px;
+}
+
+#message {
+    margin-top: 15px;
+    font-weight: bold;
+}
+
+.dark {
+    background: #111827;
+    color: white;
+}
+
+.dark #game {
+    background: linear-gradient(#334155, #475569);
+}
+
+@media (max-width: 600px) {
+    .container { margin: 15px auto; padding: 12px; }
+    #game { height: 220px; }
+}
+</style>
+</head>
+
+<body>
+<div class="container">
+    <h1>🦖 Dinosaur Runner</h1>
+
+    <div class="top">
+        <span>Score: <b id="score">0</b></span>
+        <span>Best: <b id="best">0</b></span>
+        <button onclick="toggleTheme()">🌙 Theme</button>
+        <button onclick="toggleSound()" id="soundButton">🔊 Sound ON</button>
+    </div>
+
+    <div id="game">
+        <div id="dino">🦖</div>
+        <div id="obstacle">🌵</div>
+    </div>
+
+    <p id="message">Press SPACE or tap the game to jump!</p>
+    <button onclick="startGame()">▶ Start / Restart</button>
+</div>
+
+<script>
+const dino = document.getElementById("dino");
+const obstacle = document.getElementById("obstacle");
+const game = document.getElementById("game");
+const scoreText = document.getElementById("score");
+const bestText = document.getElementById("best");
+const message = document.getElementById("message");
+
+let score = 0;
+let best = Number(localStorage.getItem("dinoBest") || 0);
+let jumping = false;
+let running = false;
+let sound = true;
+let dinoBottom = 0;
+let obstacleX = 0;
+let speed = 5;
+let animation;
+let lastTime = 0;
+
+bestText.textContent = best;
+
+function beep() {
+    if (!sound) return;
+    try {
+        const audio = new AudioContext();
+        const oscillator = audio.createOscillator();
+        const gain = audio.createGain();
+        oscillator.connect(gain);
+        gain.connect(audio.destination);
+        oscillator.frequency.value = 500;
+        gain.gain.value = 0.04;
+        oscillator.start();
+        oscillator.stop(audio.currentTime + 0.08);
+        oscillator.onended = () => audio.close();
+    } catch (e) {}
+}
+
+function jump() {
+    if (!running || jumping) return;
+    jumping = true;
+    dinoBottom = 100;
+    dino.style.bottom = dinoBottom + "px";
+    beep();
+
+    setTimeout(() => {
+        dinoBottom = 0;
+        dino.style.bottom = "0px";
+        jumping = false;
+    }, 450);
+}
+
+function toggleTheme() {
+    document.body.classList.toggle("dark");
+}
+
+function toggleSound() {
+    sound = !sound;
+    document.getElementById("soundButton").textContent =
+        sound ? "🔊 Sound ON" : "🔇 Sound OFF";
+}
+
+function startGame() {
+    cancelAnimationFrame(animation);
+    score = 0;
+    speed = 5;
+    obstacleX = game.clientWidth;
+    lastTime = 0;
+    jumping = false;
+    dinoBottom = 0;
+    dino.style.bottom = "0px";
+    obstacle.style.right = "auto";
+    obstacle.style.left = obstacleX + "px";
+    scoreText.textContent = score;
+    message.textContent = "Jump over the cactus!";
+    running = true;
+    animation = requestAnimationFrame(loop);
+}
+
+function loop(time) {
+    if (!running) return;
+
+    const delta = lastTime ? Math.min((time - lastTime) / 16.67, 2) : 1;
+    lastTime = time;
+
+    obstacleX -= speed * delta;
+
+    if (obstacleX < -45) {
+        obstacleX = game.clientWidth;
+        score++;
+        scoreText.textContent = score;
+        speed = Math.min(5 + score * 0.15, 11);
+
+        if (score > best) {
+            best = score;
+            bestText.textContent = best;
+            localStorage.setItem("dinoBest", best);
+        }
+    }
+
+    obstacle.style.left = obstacleX + "px";
+
+    const dinoRect = dino.getBoundingClientRect();
+    const obstacleRect = obstacle.getBoundingClientRect();
+
+    if (
+        dinoRect.right > obstacleRect.left + 8 &&
+        dinoRect.left < obstacleRect.right - 8 &&
+        dinoRect.bottom > obstacleRect.top + 8
+    ) {
+        running = false;
+        message.textContent = "Game Over! Your score: " + score;
+        return;
+    }
+
+    animation = requestAnimationFrame(loop);
+}
+
+document.addEventListener("keydown", event => {
+    if (event.code === "Space" || event.code === "ArrowUp") {
+        event.preventDefault();
+        jump();
+    }
+});
+
+game.addEventListener("pointerdown", jump);
+</script>
+</body>
+</html>
+```
